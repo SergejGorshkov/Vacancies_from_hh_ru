@@ -1,0 +1,19 @@
+[project]
+name = "vacancies-from-hh-ru"
+version = "0.1.0"
+description = ""
+authors = [
+    {name = "Your Name",email = "you@example.com"}
+]
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "psycopg2 (>=2.9.10,<3.0.0)",
+    "dotenv (>=0.9.9,<0.10.0)",
+    "requests (>=2.32.4,<3.0.0)"
+]
+
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
