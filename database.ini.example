@@ -1,0 +1,8 @@
+# Переименуйте файл в database.ini, поместите его в корневую директорию проекта
+# и замените значения переменных реальными данными
+
+[postgresql]
+host=your_host (default: localhost)
+user=your_postgresql_username
+password=your_postgresql_password
+port=your_port (default: 5432)

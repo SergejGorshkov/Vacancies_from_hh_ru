@@ -1,10 +1,12 @@
-
 import psycopg2
-import json
 
 
 class DBManager:
-    def __init__(self, db_name: str, params: dict) -> None:
+    db_name: str  # Название базы данных для сохранения результатов поиска
+    params: dict  # Параметры для подключения в БД
+    vacancies_list: list[dict]  # Список с вакансиями, полученный от API hh.ru, для заполнения БД
+
+    def __init__(self, db_name, params) -> None:
         """Метод-конструктор для инициализации экземпляров класса DBManager."""
         self.db_name = db_name
         self.params = params
@@ -16,17 +18,14 @@ class DBManager:
         """Создание базы данных для сохранения данных о компаниях и их вакансиях на hh.ru"""
 
         conn = psycopg2.connect(dbname='postgres', **self.params)  # Подключение к БД postgres
-
-        conn.autocommit = True  # Для данного подключения 'conn' будет автоматическое внесение изменений
-        # в БД в хранилище после каждой SQL-команды
-
-        cur = conn.cursor()  # Создание объекта 'КУРСОР' для выполнения SQL-команд
+        conn.autocommit = True  # Автоматическое внесение изменений в БД после каждой SQL-команды
+        cur = conn.cursor()
 
         cur.execute(f"DROP DATABASE IF EXISTS {self.db_name};")
         cur.execute(f"CREATE DATABASE {self.db_name} WITH ENCODING 'UTF8';")
 
         cur.close()
-        conn.close()  # Закрытие подключения к БД
+        conn.close()
 
     def _create_tables(self):
         """Создание таблиц в БД"""
@@ -36,11 +35,11 @@ class DBManager:
 
         with conn.cursor() as cur:
             cur.execute("""
-                CREATE TABLE company 
+                CREATE TABLE company
                 (
                     id SERIAL PRIMARY KEY,
                     hh_company_id INT UNIQUE NOT NULL,
-                    company_name VARCHAR(255) NOT NULL                    
+                    company_name VARCHAR(255) NOT NULL
                 )
             """)
 
@@ -63,7 +62,7 @@ class DBManager:
 
         conn.close()
 
-    def insert_data_to_db(self, vacancies_list: list[dict]) -> None:
+    def insert_data_to_db(self, vacancies_list) -> None:
         """Заполнение БД данными с сайта hh.ru о компаниях и их вакансиях"""
 
         conn = psycopg2.connect(dbname=self.db_name, **self.params)  # Подключение к ранее созданной БД
@@ -71,12 +70,12 @@ class DBManager:
 
         # Цикл по вакансиям из списка 'vacancies_list', полученных от API hh.ru
         for vacancy in vacancies_list:
-
             # Заполнение таблицы 'vacancy'
             with conn.cursor() as cur:
                 cur.execute(
-                    f"INSERT INTO vacancy (hh_vacancy_id, hh_company_id, company_name, title, salary_from, salary_to, currency, vacancy_url, description) "
-                    f"VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)",
+                    "INSERT INTO vacancy (hh_vacancy_id, hh_company_id, company_name, title, salary_from, salary_to,"
+                    " currency, vacancy_url, description) "
+                    "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)",
                     (vacancy["id"],
                      vacancy["employer"]["id"],
                      vacancy["employer"]["name"],
@@ -116,9 +115,9 @@ class DBManager:
         conn = psycopg2.connect(dbname=self.db_name, **self.params)  # Подключение к ранее созданной БД
         with conn.cursor() as cur:
             cur.execute("""
-                SELECT 
-                    company.hh_company_id, 
-                    company.company_name, 
+                SELECT
+                    company.hh_company_id,
+                    company.company_name,
                     COUNT(vacancy.hh_vacancy_id) AS vacancies_amount
                 FROM company
                 LEFT JOIN vacancy ON company.hh_company_id = vacancy.hh_company_id
@@ -130,8 +129,8 @@ class DBManager:
         # Преобразование результата в список строк для последующего вывода в консоль
         companies = []
         for row in result:
-            companies.append(f"id компании на hh.ru: {row[0]}. Название компании: {row[1]}. Количество вакансий на hh.ru: {row[2]}.\n")
-
+            companies.append(f"id компании на hh.ru: {row[0]}. Название компании: {row[1]}. "
+                             f"Количество вакансий на hh.ru: {row[2]}.\n")
         conn.close()
         return companies
 
@@ -144,15 +143,16 @@ class DBManager:
         conn = psycopg2.connect(dbname=self.db_name, **self.params)  # Подключение к ранее созданной БД
         with conn.cursor() as cur:
             cur.execute("""
-                SELECT 
-                    vacancy.company_name, 
+                SELECT
+                    vacancy.company_name,
                     vacancy.title,
                     vacancy.salary_from,
                     vacancy.salary_to,
                     vacancy.currency,
-                    vacancy.vacancy_url 
+                    vacancy.vacancy_url
                 FROM vacancy
                 LEFT JOIN company ON company.hh_company_id = vacancy.hh_company_id
+                ORDER BY vacancy.salary_from DESC
             """)
             result = cur.fetchall()
 
@@ -163,7 +163,6 @@ class DBManager:
                              f"Требуется: {row[1]}.\n"
                              f"Зарплата от {row[2] if row[2] else 0} до {row[3] if row[3] else 0} {row[4]}.\n"
                              f"Ссылка на вакансию: {row[5]}.\n")
-
         conn.close()
         return vacancies
 
@@ -195,13 +194,13 @@ class DBManager:
         conn = psycopg2.connect(dbname=self.db_name, **self.params)  # Подключение к ранее созданной БД
         with conn.cursor() as cur:
             cur.execute("""
-                SELECT 
-                    vacancy.company_name, 
+                SELECT
+                    vacancy.company_name,
                     vacancy.title,
                     vacancy.salary_from,
                     vacancy.salary_to,
                     vacancy.currency,
-                    vacancy.vacancy_url 
+                    vacancy.vacancy_url
                 FROM vacancy
                 WHERE vacancy.salary_from > (SELECT AVG(
                     COALESCE(
@@ -240,18 +239,18 @@ class DBManager:
         conn = psycopg2.connect(dbname=self.db_name, **self.params)  # Подключение к ранее созданной БД
         with conn.cursor() as cur:
             cur.execute("""
-                SELECT 
-                    vacancy.company_name, 
+                SELECT
+                    vacancy.company_name,
                     vacancy.title,
                     vacancy.salary_from,
                     vacancy.salary_to,
                     vacancy.currency,
-                    vacancy.vacancy_url 
+                    vacancy.vacancy_url
                 FROM vacancy
-                WHERE vacancy.title ILIKE %s OR vacancy.description ILIKE %s 
+                WHERE vacancy.title ILIKE %s OR vacancy.description ILIKE %s
                 ORDER BY vacancy.salary_from DESC
-            """, (f'%{keyword}%', f'%{keyword}%')
-                        )
+            """, (f'%{keyword}%', f'%{keyword}%'))
+
             result = cur.fetchall()
 
         # Преобразование результата в список строк для последующего вывода в консоль
@@ -264,4 +263,3 @@ class DBManager:
 
         conn.close()
         return vacancies
-
