@@ -17,15 +17,33 @@ class DBManager:
     def _create_database(self) -> None:
         """Создание базы данных для сохранения данных о компаниях и их вакансиях на hh.ru"""
 
-        conn = psycopg2.connect(dbname='postgres', **self.params)  # Подключение к БД postgres
-        conn.autocommit = True  # Автоматическое внесение изменений в БД после каждой SQL-команды
-        cur = conn.cursor()
+        try:
+            # Подключение к стандартной базе данных postgres
+            conn = psycopg2.connect(dbname='postgres', **self.params)
+            conn.autocommit = True  # Автоматическое внесение изменений в БД после каждой SQL-команды
+            cur = conn.cursor()
 
-        cur.execute(f"DROP DATABASE IF EXISTS {self.db_name};")
-        cur.execute(f"CREATE DATABASE {self.db_name} WITH ENCODING 'UTF8';")
+            # Проверка на существование базы данных с переданным в конструктор класса именем
+            cur.execute("SELECT 1 FROM pg_database WHERE datname = %s", (self.db_name,))
+            exists = cur.fetchone()
 
-        cur.close()
-        conn.close()
+            if not exists:
+                # Создание базы данных только если она не существует
+                cur.execute(f"CREATE DATABASE {self.db_name} WITH ENCODING 'UTF8';")
+                print(f"База данных {self.db_name} успешно создана")
+            else:
+                print(f"База данных {self.db_name} уже существует")
+
+        except psycopg2.Error as e:
+            print(f"Ошибка при работе с базой данных: {e}")
+            raise
+        finally:
+            if 'cur' in locals():
+                cur.close()
+
+            if 'conn' in locals():
+                conn.close()
+
 
     def _create_tables(self):
         """Создание таблиц в БД"""
